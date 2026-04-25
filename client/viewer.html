@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
+</head>
+<body style="margin:0">
+
+<script>
+const url = new URLSearchParams(window.location.search);
+const img = url.get("img");
+
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 1000);
+let renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+let texture = new THREE.TextureLoader().load("http://localhost:3000/" + img);
+
+let geometry = new THREE.SphereGeometry(500, 60, 40);
+geometry.scale(-1,1,1);
+
+let material = new THREE.MeshBasicMaterial({ map: texture });
+
+let mesh = new THREE.Mesh(geometry, material);
+scene.add(mesh);
+
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+
+</body>
+</html>

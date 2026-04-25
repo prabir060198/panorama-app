@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Capture Panorama</title>
+<style>
+body { margin:0; background:black; }
+
+video {
+  position:fixed;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+#status {
+  position:absolute;
+  top:20px;
+  width:100%;
+  text-align:center;
+  color:white;
+}
+
+#start {
+  position:absolute;
+  bottom:30px;
+  left:50%;
+  transform:translateX(-50%);
+  padding:15px;
+}
+</style>
+</head>
+
+<body>
+
+<video id="video" autoplay playsinline></video>
+<div id="status">Start</div>
+<button id="start">START</button>
+
+<script src="capture.js"></script>
+</body>
+</html>
