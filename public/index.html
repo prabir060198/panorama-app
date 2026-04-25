@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Test</title>
+  <style>
+    body { margin:0; }
+    video { width:100%; height:100vh; object-fit:cover; }
+    button {
+      position:absolute;
+      bottom:20px;
+      left:50%;
+      transform:translateX(-50%);
+      padding:10px 20px;
+      font-size:18px;
+    }
+  </style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline></video>
+<button onclick="capture()">Capture</button>
+
+<script>
+const video = document.getElementById("video");
+
+// open camera
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => video.srcObject = stream)
+  .catch(err => alert("Camera error: " + err));
+
+function capture() {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.drawImage(video, 0, 0);
+
+  const image = canvas.toDataURL("image/jpeg");
+
+  // show captured image
+  const img = document.createElement("img");
+  img.src = image;
+  img.style.position = "absolute";
+  img.style.top = "0";
+  img.style.width = "200px";
+
+  document.body.appendChild(img);
+}
+</script>
+
+</body>
+</html>
