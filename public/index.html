@@ -1,38 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Auto Panorama Capture</title>
+  <title>3D Street View Capture</title>
 
   <style>
-    body {
-      margin:0;
-      overflow:hidden;
-      background:black;
-      font-family:Arial;
-    }
-
+    body { margin:0; overflow:hidden; background:black; }
     video {
+      position:absolute;
       width:100%;
-      height:100vh;
+      height:100%;
       object-fit:cover;
-    }
-
-    #guide {
-      position:absolute;
-      width:25px;
-      height:25px;
-      background:red;
-      border-radius:50%;
-      transform:translate(-50%, -50%);
-    }
-
-    #target {
-      position:absolute;
-      width:25px;
-      height:25px;
-      background:lime;
-      border-radius:50%;
-      transform:translate(-50%, -50%);
+      z-index:-1;
     }
 
     #info {
@@ -41,26 +19,10 @@
       left:50%;
       transform:translateX(-50%);
       color:white;
-      font-size:16px;
       background:rgba(0,0,0,0.6);
       padding:8px 12px;
       border-radius:8px;
-    }
-
-    #preview {
-      position:absolute;
-      bottom:10px;
-      width:100%;
-      display:flex;
-      gap:10px;
-      overflow-x:auto;
-      padding:10px;
-    }
-
-    #preview img {
-      height:70px;
-      border:2px solid white;
-      border-radius:6px;
+      font-family:Arial;
     }
   </style>
 </head>
@@ -68,35 +30,21 @@
 <body>
 
 <video id="video" autoplay playsinline></video>
+<div id="info">Tap to start</div>
 
-<div id="guide"></div>   <!-- moving dot -->
-<div id="target"></div>  <!-- fixed target -->
-
-<div id="info">Move phone to align dots</div>
-<div id="preview"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158/build/three.min.js"></script>
 
 <script>
 const video = document.getElementById("video");
-const guide = document.getElementById("guide");
-const target = document.getElementById("target");
 const info = document.getElementById("info");
-const preview = document.getElementById("preview");
 
-let images = [];
+let scene, camera, renderer;
+let targets = [];
 let step = 0;
+let images = [];
 let capturing = false;
 
-// 🎯 TARGET POSITIONS (angles)
-const targets = [
-  {yaw:0, pitch:0},
-  {yaw:30, pitch:0},
-  {yaw:60, pitch:0},
-  {yaw:90, pitch:0},
-  {yaw:45, pitch:-20},
-  {yaw:45, pitch:20}
-];
-
-// 📷 START CAMERA
+// 🎥 CAMERA STREAM
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: { ideal: "environment" } }
@@ -105,33 +53,62 @@ async function startCamera() {
 }
 startCamera();
 
-// 🎯 PLACE TARGET DOT CENTER
-target.style.left = "50%";
-target.style.top = "50%";
+// 🎮 THREE SETUP
+scene = new THREE.Scene();
 
-// 📐 CONVERT GYRO TO SCREEN
-function updateGuide(alpha, beta) {
-  const targetData = targets[step];
+camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 
-  let dx = alpha - targetData.yaw;
-  let dy = beta - targetData.pitch;
+renderer = new THREE.WebGLRenderer({ alpha:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-  // normalize angles
-  dx = ((dx + 540) % 360) - 180;
+// 🌐 SPHERE (environment reference)
+const geometry = new THREE.SphereGeometry(50, 32, 32);
+const material = new THREE.MeshBasicMaterial({
+  color: 0x111111,
+  wireframe: true
+});
+const sphere = new THREE.Mesh(geometry, material);
+scene.add(sphere);
 
-  const x = 50 + dx;   // horizontal move
-  const y = 50 + dy;   // vertical move
+// 🎯 CREATE TARGET DOTS
+function createTarget(x, y, z) {
+  const geo = new THREE.SphereGeometry(1, 16, 16);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  const dot = new THREE.Mesh(geo, mat);
 
-  guide.style.left = x + "%";
-  guide.style.top = y + "%";
+  dot.position.set(x, y, z);
+  scene.add(dot);
 
-  // 🎯 AUTO CAPTURE WHEN ALIGNED
-  if (Math.abs(dx) < 5 && Math.abs(dy) < 5 && !capturing) {
-    capture();
-  }
+  targets.push(dot);
 }
 
-// 📸 CAPTURE FUNCTION
+// 📍 TARGET POSITIONS (around sphere)
+createTarget(20, 0, -40);
+createTarget(-20, 0, -40);
+createTarget(0, 20, -40);
+createTarget(0, -20, -40);
+createTarget(30, 10, -40);
+createTarget(-30, -10, -40);
+
+// 🎥 CAMERA POSITION
+camera.position.set(0, 0, 0);
+
+// 📡 GYRO CONTROL
+function handleOrientation(event) {
+  const alpha = event.alpha * Math.PI / 180;
+  const beta = event.beta * Math.PI / 180;
+
+  camera.rotation.y = alpha;
+  camera.rotation.x = beta;
+}
+
+// 📸 CAPTURE
 function capture() {
   capturing = true;
 
@@ -142,56 +119,65 @@ function capture() {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
 
-  const imgData = canvas.toDataURL("image/jpeg", 0.8);
-  images.push(imgData);
+  images.push(canvas.toDataURL("image/jpeg"));
 
-  // show preview
-  const img = document.createElement("img");
-  img.src = imgData;
-  preview.appendChild(img);
+  targets[step].material.color.set(0x555555); // mark done
 
   step++;
 
   if (step >= targets.length) {
-    info.innerText = "Done ✅";
-    window.removeEventListener("deviceorientation", handleOrientation);
+    info.innerText = "All captured ✅";
     console.log(images);
     return;
   }
 
   info.innerText = `Captured ${step}/${targets.length}`;
 
-  setTimeout(() => capturing = false, 1000); // prevent duplicate capture
+  setTimeout(() => capturing = false, 1000);
 }
 
-// 📡 GYROSCOPE EVENT
-function handleOrientation(event) {
-  const alpha = event.alpha || 0; // yaw
-  const beta = event.beta || 0;   // pitch
+// 🎯 ALIGN CHECK
+function checkAlignment() {
+  if (step >= targets.length) return;
 
-  updateGuide(alpha, beta);
-}
+  const target = targets[step];
 
-// ⚠️ iOS permission
-function initGyro() {
-  if (typeof DeviceOrientationEvent !== "undefined" &&
-      typeof DeviceOrientationEvent.requestPermission === "function") {
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
 
-    DeviceOrientationEvent.requestPermission()
-      .then(response => {
-        if (response === "granted") {
-          window.addEventListener("deviceorientation", handleOrientation);
-        } else {
-          alert("Permission denied");
-        }
-      });
+  const targetDir = target.position.clone().normalize();
 
-  } else {
-    window.addEventListener("deviceorientation", handleOrientation);
+  const angle = dir.angleTo(targetDir);
+
+  if (angle < 0.2 && !capturing) {
+    capture();
   }
 }
 
-// 👆 start on tap (required for mobile)
+// 🔄 RENDER LOOP
+function animate() {
+  requestAnimationFrame(animate);
+  checkAlignment();
+  renderer.render(scene, camera);
+}
+animate();
+
+// 📱 INIT GYRO
+function initGyro() {
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    DeviceOrientationEvent.requestPermission()
+      .then(res => {
+        if (res === "granted") {
+          window.addEventListener("deviceorientation", handleOrientation);
+        }
+      });
+  } else {
+    window.addEventListener("deviceorientation", handleOrientation);
+  }
+
+  info.innerText = "Move phone to align targets";
+}
+
 document.body.addEventListener("click", initGyro, { once:true });
 
 </script>
