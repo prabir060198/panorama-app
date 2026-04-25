@@ -1,34 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Camera Test</title>
+  <title>Guided Panorama Capture</title>
   <style>
-    body { margin:0; }
+    body { margin:0; overflow:hidden; background:black; }
     video { width:100%; height:100vh; object-fit:cover; }
-    button {
+
+    #guide {
+      position:absolute;
+      width:25px;
+      height:25px;
+      background:red;
+      border-radius:50%;
+      transform:translate(-50%, -50%);
+    }
+
+    #btn {
       position:absolute;
       bottom:20px;
       left:50%;
       transform:translateX(-50%);
-      padding:10px 20px;
+      padding:12px 25px;
       font-size:18px;
+    }
+
+    #info {
+      position:absolute;
+      top:20px;
+      left:50%;
+      transform:translateX(-50%);
+      color:white;
+      font-size:18px;
+      background:rgba(0,0,0,0.5);
+      padding:8px 12px;
+      border-radius:8px;
     }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline></video>
-<button onclick="capture()">Capture</button>
+<div id="guide"></div>
+<div id="info">Align dot and capture</div>
+<button id="btn">Capture</button>
 
 <script>
 const video = document.getElementById("video");
+const guide = document.getElementById("guide");
+const info = document.getElementById("info");
 
-// open camera
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => video.srcObject = stream)
-  .catch(err => alert("Camera error: " + err));
+// ✅ BACK CAMERA FIX
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: { exact: "environment" } }
+})
+.then(stream => video.srcObject = stream)
+.catch(() => {
+  // fallback if exact fails
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  }).then(stream => video.srcObject = stream);
+});
 
-function capture() {
+let images = [];
+let step = 0;
+
+// 🎯 GUIDE POSITIONS (like panorama sweep)
+const positions = [
+  {x:20, y:50},
+  {x:40, y:50},
+  {x:60, y:50},
+  {x:80, y:50},
+  {x:50, y:30},
+  {x:50, y:70}
+];
+
+function moveGuide() {
+  const pos = positions[step];
+  guide.style.left = pos.x + "%";
+  guide.style.top = pos.y + "%";
+  info.innerText = `Step ${step + 1} / ${positions.length}`;
+}
+
+moveGuide();
+
+// 📸 CAPTURE
+document.getElementById("btn").onclick = () => {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
@@ -37,17 +93,18 @@ function capture() {
 
   ctx.drawImage(video, 0, 0);
 
-  const image = canvas.toDataURL("image/jpeg");
+  images.push(canvas.toDataURL("image/jpeg"));
 
-  // show captured image
-  const img = document.createElement("img");
-  img.src = image;
-  img.style.position = "absolute";
-  img.style.top = "0";
-  img.style.width = "200px";
+  step++;
 
-  document.body.appendChild(img);
-}
+  if (step < positions.length) {
+    moveGuide();
+  } else {
+    info.innerText = "Captured all images ✅";
+    console.log("Captured images:", images);
+    // next step: send to backend
+  }
+};
 </script>
 
 </body>
