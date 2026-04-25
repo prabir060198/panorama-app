@@ -1,459 +1,215 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Photosphere Capture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Photo Sphere</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#000;color:#fff;font-family:Arial,sans-serif;overflow:hidden;height:100vh;width:100vw}
-#app{position:relative;width:100%;height:100vh}
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
-
-#overlay{position:absolute;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 14px 20px}
-
-#top-bar{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px}
-.pill{background:rgba(0,0,0,0.65);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:500;white-space:nowrap}
-.pill.blue{background:rgba(33,150,243,0.85)}
-.pill.green{background:rgba(76,175,80,0.85)}
-.pill.amber{background:rgba(255,152,0,0.85);color:#000}
-
-#compass-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
-#compass{position:relative;width:100px;height:100px}
-#compass svg{width:100%;height:100%}
-
-#viewfinder{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-#outer-frame{position:absolute;inset:0;border:2.5px solid rgba(255,255,255,0.85);border-radius:3px}
-#corner-tl,#corner-tr,#corner-bl,#corner-br{position:absolute;width:14px;height:14px}
-#corner-tl{top:0;left:0;border-top:2.5px solid #90caf9;border-left:2.5px solid #90caf9}
-#corner-tr{top:0;right:0;border-top:2.5px solid #90caf9;border-right:2.5px solid #90caf9}
-#corner-bl{bottom:0;left:0;border-bottom:2.5px solid #90caf9;border-left:2.5px solid #90caf9}
-#corner-br{bottom:0;right:0;border-bottom:2.5px solid #90caf9;border-right:2.5px solid #90caf9}
-#crosshair-h{position:absolute;width:18px;height:1.5px;background:rgba(255,255,255,0.55);left:50%;transform:translateX(-50%)}
-#crosshair-v{position:absolute;height:18px;width:1.5px;background:rgba(255,255,255,0.55);top:50%;transform:translateY(-50%)}
-#align-circle{width:60px;height:60px;border:2.5px solid white;border-radius:50%}
-#aim-indicator{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(255,255,255,0.7);white-space:nowrap;text-align:center}
-
-#tilt-bar-wrap{position:absolute;right:-30px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
-#tilt-bar-track{width:6px;height:140px;background:rgba(255,255,255,0.15);border-radius:3px;position:relative}
-#tilt-bar-fill{position:absolute;bottom:50%;left:0;width:100%;background:#90caf9;border-radius:3px;transition:height 0.1s}
-#tilt-label{font-size:10px;color:rgba(255,255,255,0.6)}
-
-#grid-dots{display:flex;flex-direction:column;gap:5px;align-items:center}
-.dot-row{display:flex;gap:5px}
-.dot{width:11px;height:11px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.4);background:transparent;transition:background 0.2s,border-color 0.2s}
-.dot.done{background:#4caf50;border-color:#4caf50}
-.dot.current{background:#2196f3;border-color:#2196f3}
-.dot.skipped{background:rgba(255,152,0,0.5);border-color:#ff9800}
-
-#bottom-area{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
-
-#auto-timer-wrap{display:flex;align-items:center;gap:8px;pointer-events:all}
-#timer-ring{position:relative;width:40px;height:40px}
-#timer-ring svg{width:100%;height:100%}
-#timer-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500}
-#timer-toggle{background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.5);border-radius:20px;color:white;font-size:12px;padding:5px 12px;cursor:pointer}
-#timer-toggle.on{background:rgba(33,150,243,0.7);border-color:#90caf9}
-
-#controls{display:flex;align-items:center;justify-content:center;gap:32px;pointer-events:all}
-.ctrl-btn{width:56px;height:56px;border-radius:50%;border:2px solid rgba(255,255,255,0.65);background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;color:white;user-select:none;transition:transform 0.1s}
-.ctrl-btn:active{transform:scale(0.91)}
-#btn-capture{width:70px;height:70px;background:#90caf9;border-color:white;color:#000;font-size:28px}
-#btn-capture.ready{box-shadow:0 0 0 4px rgba(144,202,249,0.4)}
-
-#flash{position:absolute;inset:0;z-index:100;background:white;opacity:0;pointer-events:none;transition:opacity 0.12s}
-
-#start-screen{position:absolute;inset:0;z-index:200;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px;text-align:center}
-#start-screen h1{font-size:20px}
-#start-screen p{font-size:13px;color:rgba(255,255,255,0.7);line-height:1.6;max-width:300px}
-.sphere-icon{width:64px;height:64px;border-radius:50%;border:3px solid #2196f3;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500}
-.action-btn{background:#2196f3;border:none;border-radius:22px;color:white;font-size:15px;padding:12px 32px;cursor:pointer}
-
-#done-screen{position:absolute;inset:0;z-index:200;background:rgba(0,0,0,0.93);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;overflow-y:auto}
-#done-screen h2{font-size:20px}
-#done-screen p{font-size:13px;color:rgba(255,255,255,0.7)}
-#strip-wrap{width:100%;overflow-x:auto;padding:4px 0}
-#strip{display:flex;gap:5px;padding:4px 0}
-.thumb{width:60px;height:60px;flex-shrink:0;border-radius:4px;object-fit:cover;border:1.5px solid rgba(255,255,255,0.25)}
-#btn-download{background:#4caf50;border:none;border-radius:22px;color:white;font-size:14px;padding:11px 28px;cursor:pointer}
-#btn-restart2{background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.4);border-radius:22px;color:white;font-size:14px;padding:11px 28px;cursor:pointer}
-#download-status{font-size:12px;color:rgba(255,255,255,0.6)}
-#gyro-status{font-size:11px;color:rgba(255,255,255,0.5);background:rgba(0,0,0,0.4);border-radius:10px;padding:4px 10px;pointer-events:none}
+body{margin:0;background:black;color:white;font-family:sans-serif;overflow:hidden}
+video{position:absolute;width:100%;height:100%;object-fit:cover}
+#ui{
+  position:absolute;
+  width:100%;height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+#target{
+  width:60px;height:60px;
+  border:3px solid white;
+  border-radius:50%;
+}
+#dot{
+  position:absolute;
+  width:12px;height:12px;
+  border-radius:50%;
+  background:red;
+}
+button{
+  position:absolute;
+  bottom:40px;
+  padding:15px 30px;
+  font-size:16px;
+}
+canvas{position:absolute;top:0;left:0}
 </style>
 </head>
 <body>
-<div id="app">
-<video id="video" autoplay playsinline muted></video>
-<div id="flash"></div>
 
-<div id="start-screen">
-  <div class="sphere-icon">360</div>
-  <h1>Photosphere Capture</h1>
-  <p>Capture 24 shots across 4 rows. The compass guides your aim, the tilt bar keeps you level, and auto-timer fires the shot hands-free.</p>
-  <button class="action-btn" id="btn-start">Start</button>
-  <div id="gyro-status">Gyroscope will be requested on start</div>
+<video id="video" autoplay playsinline></video>
+
+<div id="ui">
+  <div id="target"></div>
+  <div id="dot"></div>
+  <button onclick="capture()">Capture</button>
 </div>
 
-<div id="overlay">
-  <div id="top-bar">
-    <div class="pill" id="progress-pill">0 / 24</div>
-    <div class="pill blue" id="row-pill">Row 1: Sky</div>
-    <div class="pill" id="aim-pill">Aim 0°</div>
-  </div>
-
-  <div id="compass-wrap">
-    <div id="compass">
-      <svg viewBox="0 0 100 100" id="compass-svg">
-        <circle cx="50" cy="50" r="46" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-        <text x="50" y="16" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="10" font-weight="bold">N</text>
-        <text x="84" y="54" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">E</text>
-        <text x="50" y="90" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">S</text>
-        <text x="16" y="54" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9">W</text>
-        <line x1="50" y1="8" x2="50" y2="26" stroke="#ef5350" stroke-width="2.5" stroke-linecap="round"/>
-        <line x1="50" y1="74" x2="50" y2="92" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"/>
-        <g id="compass-needle">
-          <polygon points="50,14 54,50 50,44 46,50" fill="#ef5350"/>
-          <polygon points="50,86 54,50 50,56 46,50" fill="rgba(255,255,255,0.7)"/>
-        </g>
-        <circle cx="50" cy="50" r="4" fill="white"/>
-        <line id="target-line" x1="50" y1="50" x2="50" y2="18" stroke="#90caf9" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 2"/>
-        <circle id="target-dot" cx="50" cy="18" r="4" fill="#90caf9"/>
-      </svg>
-    </div>
-    <div id="gyro-angle-pill" class="pill" style="font-size:11px">-- °</div>
-  </div>
-
-  <div id="viewfinder">
-    <div id="outer-frame">
-      <div id="corner-tl"></div><div id="corner-tr"></div>
-      <div id="corner-bl"></div><div id="corner-br"></div>
-    </div>
-    <div id="crosshair-h"></div>
-    <div id="crosshair-v"></div>
-    <div id="align-circle"></div>
-    <div id="aim-indicator">align subject in frame</div>
-    <div id="tilt-bar-wrap">
-      <div id="tilt-bar-track">
-        <div id="tilt-bar-fill" style="height:0%"></div>
-      </div>
-      <div id="tilt-label">tilt</div>
-    </div>
-  </div>
-
-  <div id="grid-dots"></div>
-
-  <div id="bottom-area">
-    <div id="auto-timer-wrap">
-      <div id="timer-ring">
-        <svg viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
-          <circle id="timer-arc" cx="20" cy="20" r="16" fill="none" stroke="#90caf9" stroke-width="3"
-            stroke-dasharray="100.5" stroke-dashoffset="100.5" stroke-linecap="round"
-            transform="rotate(-90 20 20)"/>
-        </svg>
-        <div id="timer-num">3</div>
-      </div>
-      <button id="timer-toggle">Auto-timer: OFF</button>
-      <select id="timer-delay" style="background:rgba(0,0,0,0.6);border:1.5px solid rgba(255,255,255,0.4);border-radius:12px;color:white;font-size:12px;padding:4px 8px">
-        <option value="2">2s</option>
-        <option value="3" selected>3s</option>
-        <option value="5">5s</option>
-      </select>
-    </div>
-
-    <div id="controls">
-      <div class="ctrl-btn" id="btn-skip" title="Skip">&#8631;</div>
-      <div class="ctrl-btn" id="btn-capture">&#9679;</div>
-      <div class="ctrl-btn" id="btn-undo" title="Undo">&#8617;</div>
-    </div>
-  </div>
-</div>
-
-<div id="done-screen">
-  <div class="sphere-icon" style="border-color:#4caf50;font-size:24px">&#10003;</div>
-  <h2>Photosphere complete!</h2>
-  <p id="done-summary">All 24 shots captured.</p>
-  <div id="strip-wrap"><div id="strip"></div></div>
-  <button id="btn-download">Download all images</button>
-  <div id="download-status"></div>
-  <button id="btn-restart2">Capture again</button>
-</div>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 
 <script>
-const ROWS = [
-  {name:"Sky",   angle:-60, shots:6},
-  {name:"Upper", angle:-20, shots:8},
-  {name:"Lower", angle:+20, shots:8},
-  {name:"Ground",angle:+60, shots:2},
-];
+let video = document.getElementById("video");
+let dot = document.getElementById("dot");
+
+let images = [];
+let index = 0;
+
 const TOTAL = 24;
 
-let shots = [], captures = [], current = 0, stream = null;
-let gyroAlpha = null, gyroBeta = null;
-let autoTimerOn = false, timerCountdown = 0, timerInterval = null;
-let timerDelay = 3;
+let gyroAlpha = 0;
+let gyroBeta = 0;
 
-function buildShots(){
-  shots = [];
-  ROWS.forEach((r,ri)=>{
-    for(let i=0;i<r.shots;i++){
-      shots.push({row:ri,rowName:r.name,col:i,hz:Math.round((i/r.shots)*360),vt:r.angle});
-    }
+const shots = [];
+for(let i=0;i<24;i++){
+  shots.push({
+    hz: (i%6)*60,
+    vt: Math.floor(i/6)*30 - 45
   });
 }
 
-function buildDots(){
-  const wrap = document.getElementById("grid-dots");
-  wrap.innerHTML="";
-  ROWS.forEach((r,ri)=>{
-    const row=document.createElement("div");
-    row.className="dot-row";
-    for(let i=0;i<r.shots;i++){
-      const idx=shots.findIndex(s=>s.row===ri&&s.col===i);
-      const d=document.createElement("div");
-      d.className="dot";d.id="dot-"+idx;
-      row.appendChild(d);
-    }
-    wrap.appendChild(row);
-  });
-}
+// CAMERA
+navigator.mediaDevices.getUserMedia({
+  video:{facingMode:"environment"}
+}).then(stream=>{
+  video.srcObject = stream;
+});
 
-function refreshDots(){
-  shots.forEach((_,idx)=>{
-    const d=document.getElementById("dot-"+idx);
-    if(!d)return;
-    d.className="dot";
-    if(captures[idx]==="skip") d.classList.add("skipped");
-    else if(captures[idx]) d.classList.add("done");
-    else if(idx===current) d.classList.add("current");
-  });
-}
+// GYRO
+window.addEventListener("deviceorientation", e=>{
+  gyroAlpha = e.alpha || 0;
+  gyroBeta = e.beta || 0;
 
-function updateHUD(){
-  const done=captures.filter(c=>c&&c!=="skip").length;
-  document.getElementById("progress-pill").textContent=done+" / "+TOTAL;
-  if(current<shots.length){
-    const s=shots[current];
-    document.getElementById("row-pill").textContent="Row "+(s.row+1)+": "+s.rowName;
-    document.getElementById("aim-pill").textContent="Aim "+s.hz+"°";
-    updateCompassTarget(s.hz);
-    updateAimHint(s.hz, s.vt);
+  updateTarget();
+});
+
+// TARGET MOVEMENT
+function updateTarget(){
+  if(index>=TOTAL)return;
+
+  let t = shots[index];
+
+  let diffH = ((t.hz - gyroAlpha)+540)%360-180;
+  let diffV = t.vt - gyroBeta;
+
+  let x = 50 + diffH;
+  let y = 50 + diffV;
+
+  x = Math.max(10, Math.min(90,x));
+  y = Math.max(10, Math.min(90,y));
+
+  dot.style.left = x+"%";
+  dot.style.top = y+"%";
+
+  if(Math.abs(diffH)<5 && Math.abs(diffV)<5){
+    dot.style.background="lime";
+  }else{
+    dot.style.background="red";
   }
 }
 
-function updateCompassTarget(targetHz){
-  const r=16, cx=50, cy=50;
-  const rad=(targetHz-90)*Math.PI/180;
-  const x=cx+r*Math.cos(rad);
-  const y=cy+r*Math.sin(rad);
-  document.getElementById("target-dot").setAttribute("cx",x.toFixed(1));
-  document.getElementById("target-dot").setAttribute("cy",y.toFixed(1));
-  document.getElementById("target-line").setAttribute("x2",x.toFixed(1));
-  document.getElementById("target-line").setAttribute("y2",y.toFixed(1));
-}
+// CAPTURE
+function capture(){
+  if(index>=TOTAL)return;
 
-function updateCompassNeedle(alpha){
-  const needle=document.getElementById("compass-needle");
-  needle.setAttribute("transform","rotate("+(-alpha)+",50,50)");
-  document.getElementById("gyro-angle-pill").textContent=Math.round(alpha)+" °";
-}
+  let canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-function updateAimHint(targetHz, targetVt){
-  if(gyroAlpha===null) return;
-  let diff=((targetHz-gyroAlpha)+540)%360-180;
-  let vdiff=targetVt-(gyroBeta||0);
-  let hint="";
-  if(Math.abs(diff)>15) hint+=(diff>0?"Rotate right ":"Rotate left ")+Math.abs(Math.round(diff))+"°  ";
-  if(Math.abs(vdiff)>10) hint+=(vdiff>0?"Tilt down ":"Tilt up ")+Math.abs(Math.round(vdiff))+"°";
-  if(!hint) hint="Aligned — ready to shoot";
-  document.getElementById("aim-indicator").textContent=hint;
-  const aligned=Math.abs(diff)<15&&Math.abs(vdiff)<10;
-  const cap=document.getElementById("btn-capture");
-  if(aligned) cap.classList.add("ready"); else cap.classList.remove("ready");
-  if(aligned && autoTimerOn && timerCountdown===0) startTimerCountdown();
-  if(!aligned && timerCountdown>0) cancelTimer();
-}
+  canvas.getContext("2d").drawImage(video,0,0);
 
-function updateTiltBar(beta){
-  const pct=Math.min(100,Math.max(0,((beta+90)/180)*100));
-  document.getElementById("tilt-bar-fill").style.height=pct+"%";
-}
+  images.push(canvas.toDataURL("image/jpeg"));
 
-function flashEffect(){
-  const f=document.getElementById("flash");
-  f.style.opacity="0.9";
-  setTimeout(()=>f.style.opacity="0",130);
-}
+  index++;
 
-function captureFrame(){
-  const v=document.getElementById("video");
-  const c=document.createElement("canvas");
-  c.width=v.videoWidth||1280;c.height=v.videoHeight||720;
-  c.getContext("2d").drawImage(v,0,0);
-  return c.toDataURL("image/jpeg",0.85);
-}
-
-function advance(){
-  current++;
-  refreshDots();
-  updateHUD();
-  timerCountdown=0;
-  setTimerArc(0,1);
-  document.getElementById("timer-num").textContent=timerDelay;
-  if(current>=shots.length) setTimeout(showDone,350);
-}
-
-function doCapture(){
-  if(current>=shots.length)return;
-  cancelTimer();
-  captures[current]=captureFrame();
-  flashEffect();
-  advance();
-}
-
-function doSkip(){
-  if(current>=shots.length)return;
-  cancelTimer();
-  captures[current]="skip";
-  advance();
-}
-
-function doUndo(){
-  if(current===0)return;
-  cancelTimer();
-  current--;
-  captures[current]=null;
-  refreshDots();
-  updateHUD();
-}
-
-function setTimerArc(elapsed, total){
-  const circ=100.5;
-  document.getElementById("timer-arc").style.strokeDashoffset=circ*(1-elapsed/total);
-}
-
-function startTimerCountdown(){
-  if(timerCountdown>0)return;
-  timerDelay=parseInt(document.getElementById("timer-delay").value)||3;
-  timerCountdown=timerDelay;
-  document.getElementById("timer-num").textContent=timerCountdown;
-  const start=Date.now();
-  timerInterval=setInterval(()=>{
-    const elapsed=(Date.now()-start)/1000;
-    timerCountdown=Math.max(0,timerDelay-elapsed);
-    document.getElementById("timer-num").textContent=Math.ceil(timerCountdown);
-    setTimerArc(elapsed,timerDelay);
-    if(elapsed>=timerDelay){
-      clearInterval(timerInterval);timerInterval=null;timerCountdown=0;
-      doCapture();
-    }
-  },50);
-}
-
-function cancelTimer(){
-  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
-  timerCountdown=0;
-  setTimerArc(0,1);
-  document.getElementById("timer-num").textContent=document.getElementById("timer-delay").value||3;
-}
-
-async function startCamera(){
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false
-    });
-    document.getElementById("video").srcObject=stream;
-  }catch(e){alert("Camera denied. Please allow camera access and reload.");}
-}
-
-function handleOrientation(e){
-  gyroAlpha=e.alpha||0;
-  gyroBeta=e.beta||0;
-  updateCompassNeedle(gyroAlpha);
-  updateTiltBar(gyroBeta);
-  if(current<shots.length) updateAimHint(shots[current].hz,shots[current].vt);
-}
-
-async function requestGyro(){
-  if(typeof DeviceOrientationEvent!=="undefined"&&DeviceOrientationEvent.requestPermission){
-    try{
-      const res=await DeviceOrientationEvent.requestPermission();
-      if(res==="granted") window.addEventListener("deviceorientation",handleOrientation,true);
-    }catch(e){}
-  } else {
-    window.addEventListener("deviceorientation",handleOrientation,true);
+  if(index===TOTAL){
+    start3D();
   }
 }
 
-function showDone(){
-  const strip=document.getElementById("strip");
-  strip.innerHTML="";
-  const real=captures.filter(c=>c&&c!=="skip");
-  captures.forEach((c,i)=>{
-    if(!c||c==="skip")return;
-    const img=document.createElement("img");
-    img.src=c;img.className="thumb";
-    img.title="Shot "+(i+1)+": "+shots[i].rowName+" "+shots[i].hz+"°";
-    strip.appendChild(img);
+// =======================
+// 3D SPHERE VIEWER
+// =======================
+function start3D(){
+
+  document.body.innerHTML = "";
+
+  let scene = new THREE.Scene();
+
+  let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 1100);
+
+  let renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  let texture = createEquirectangular();
+
+  let geometry = new THREE.SphereGeometry(500, 60, 40);
+  geometry.scale(-1,1,1);
+
+  let material = new THREE.MeshBasicMaterial({map:texture});
+
+  let mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
+  let lon = 0, lat = 0;
+
+  document.addEventListener("mousemove", e=>{
+    lon += e.movementX * 0.1;
+    lat -= e.movementY * 0.1;
   });
-  document.getElementById("done-summary").textContent=
-    real.length+" photos captured, "+(captures.filter(c=>c==="skip").length)+" skipped.";
-  document.getElementById("done-screen").style.display="flex";
+
+  function animate(){
+    requestAnimationFrame(animate);
+
+    lat = Math.max(-85, Math.min(85, lat));
+
+    let phi = THREE.MathUtils.degToRad(90 - lat);
+    let theta = THREE.MathUtils.degToRad(lon);
+
+    camera.target = new THREE.Vector3(
+      500 * Math.sin(phi) * Math.cos(theta),
+      500 * Math.cos(phi),
+      500 * Math.sin(phi) * Math.sin(theta)
+    );
+
+    camera.lookAt(camera.target);
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
 }
 
-function downloadAll(){
-  const real=captures.filter(c=>c&&c!=="skip");
-  if(!real.length){document.getElementById("download-status").textContent="No images to download.";return;}
-  document.getElementById("download-status").textContent="Downloading "+real.length+" images...";
-  let idx=0;
-  captures.forEach((c,i)=>{
-    if(!c||c==="skip")return;
-    const a=document.createElement("a");
-    a.href=c;
-    a.download="photosphere_"+(i+1).toString().padStart(2,"0")+"_"+shots[i].rowName+"_"+shots[i].hz+"deg.jpg";
-    document.body.appendChild(a);
-    setTimeout(()=>{a.click();document.body.removeChild(a);},idx*300);
-    idx++;
+// =======================
+// SIMPLE STITCH (BASIC)
+// =======================
+function createEquirectangular(){
+
+  let canvas = document.createElement("canvas");
+  canvas.width = 2048;
+  canvas.height = 1024;
+
+  let ctx = canvas.getContext("2d");
+
+  let img = new Image();
+  img.src = images[0]; // simple preview (not perfect stitch)
+
+  ctx.fillStyle="black";
+  ctx.fillRect(0,0,2048,1024);
+
+  images.forEach((src,i)=>{
+    let x = (i%6)*(2048/6);
+    let y = Math.floor(i/6)*(1024/4);
+
+    let im = new Image();
+    im.src = src;
+    im.onload=()=>{
+      ctx.drawImage(im,x,y,340,250);
+    }
   });
-  setTimeout(()=>{
-    document.getElementById("download-status").textContent="Done! "+real.length+" images saved.";
-  },idx*300+500);
+
+  return new THREE.CanvasTexture(canvas);
 }
-
-function restart(){
-  current=0;captures=[];
-  cancelTimer();
-  document.getElementById("done-screen").style.display="none";
-  refreshDots();updateHUD();
-}
-
-document.getElementById("btn-start").addEventListener("click",async()=>{
-  document.getElementById("start-screen").style.display="none";
-  buildShots();buildDots();refreshDots();updateHUD();
-  await startCamera();
-  await requestGyro();
-});
-
-document.getElementById("btn-capture").addEventListener("click",()=>{cancelTimer();doCapture();});
-document.getElementById("btn-skip").addEventListener("click",doSkip);
-document.getElementById("btn-undo").addEventListener("click",doUndo);
-document.getElementById("btn-download").addEventListener("click",downloadAll);
-document.getElementById("btn-restart2").addEventListener("click",restart);
-
-document.getElementById("timer-toggle").addEventListener("click",()=>{
-  autoTimerOn=!autoTimerOn;
-  const btn=document.getElementById("timer-toggle");
-  btn.textContent="Auto-timer: "+(autoTimerOn?"ON":"OFF");
-  if(autoTimerOn) btn.classList.add("on"); else{btn.classList.remove("on");cancelTimer();}
-});
-
-document.getElementById("timer-delay").addEventListener("change",function(){
-  timerDelay=parseInt(this.value)||3;
-  document.getElementById("timer-num").textContent=timerDelay;
-  cancelTimer();
-});
-
-buildShots();buildDots();refreshDots();updateHUD();updateCompassTarget(0);
 </script>
+
 </body>
 </html>
