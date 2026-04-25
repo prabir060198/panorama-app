@@ -2,9 +2,20 @@
 <html>
 <head>
   <title>Guided Panorama Capture</title>
+
   <style>
-    body { margin:0; overflow:hidden; background:black; }
-    video { width:100%; height:100vh; object-fit:cover; }
+    body {
+      margin:0;
+      overflow:hidden;
+      background:black;
+      font-family:Arial;
+    }
+
+    video {
+      width:100%;
+      height:100vh;
+      object-fit:cover;
+    }
 
     #guide {
       position:absolute;
@@ -22,6 +33,10 @@
       transform:translateX(-50%);
       padding:12px 25px;
       font-size:18px;
+      border:none;
+      border-radius:8px;
+      background:#00c853;
+      color:white;
     }
 
     #info {
@@ -35,36 +50,67 @@
       padding:8px 12px;
       border-radius:8px;
     }
+
+    /* ✅ IMAGE PREVIEW BAR */
+    #preview {
+      position:absolute;
+      bottom:80px;
+      left:0;
+      width:100%;
+      display:flex;
+      overflow-x:auto;
+      gap:10px;
+      padding:10px;
+    }
+
+    #preview img {
+      height:80px;
+      border-radius:8px;
+      border:2px solid white;
+    }
   </style>
 </head>
+
 <body>
 
 <video id="video" autoplay playsinline></video>
+
 <div id="guide"></div>
 <div id="info">Align dot and capture</div>
 <button id="btn">Capture</button>
+
+<!-- ✅ PREVIEW -->
+<div id="preview"></div>
 
 <script>
 const video = document.getElementById("video");
 const guide = document.getElementById("guide");
 const info = document.getElementById("info");
+const preview = document.getElementById("preview");
+const btn = document.getElementById("btn");
 
-// ✅ BACK CAMERA FIX
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: { exact: "environment" } }
-})
-.then(stream => video.srcObject = stream)
-.catch(() => {
-  // fallback if exact fails
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
-  }).then(stream => video.srcObject = stream);
-});
+// ✅ BACK CAMERA (works in most devices)
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    alert("Camera access failed: " + err.message);
+  }
+}
+
+startCamera();
 
 let images = [];
 let step = 0;
 
-// 🎯 GUIDE POSITIONS (like panorama sweep)
+// 🎯 GUIDE POSITIONS (panorama flow)
 const positions = [
   {x:20, y:50},
   {x:40, y:50},
@@ -74,6 +120,7 @@ const positions = [
   {x:50, y:70}
 ];
 
+// 🔄 MOVE GUIDE
 function moveGuide() {
   const pos = positions[step];
   guide.style.left = pos.x + "%";
@@ -83,8 +130,14 @@ function moveGuide() {
 
 moveGuide();
 
-// 📸 CAPTURE
-document.getElementById("btn").onclick = () => {
+// 📸 CAPTURE IMAGE
+btn.onclick = () => {
+
+  if (!video.videoWidth) {
+    alert("Camera not ready yet");
+    return;
+  }
+
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
@@ -93,7 +146,14 @@ document.getElementById("btn").onclick = () => {
 
   ctx.drawImage(video, 0, 0);
 
-  images.push(canvas.toDataURL("image/jpeg"));
+  const imgData = canvas.toDataURL("image/jpeg", 0.8);
+
+  images.push(imgData);
+
+  // ✅ SHOW PREVIEW IMAGE
+  const img = document.createElement("img");
+  img.src = imgData;
+  preview.appendChild(img);
 
   step++;
 
@@ -101,8 +161,12 @@ document.getElementById("btn").onclick = () => {
     moveGuide();
   } else {
     info.innerText = "Captured all images ✅";
-    console.log("Captured images:", images);
-    // next step: send to backend
+    btn.disabled = true;
+
+    console.log("All Images:", images);
+
+    // 👉 NEXT STEP: send images to backend
+    // fetch('/upload', { method:'POST', body: JSON.stringify(images) })
   }
 };
 </script>
