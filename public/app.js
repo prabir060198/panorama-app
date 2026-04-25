@@ -1,99 +1,170 @@
-let scene, camera, renderer;
+// ================= CONFIG =================
+const CONFIG = {
+  holdTime: 1000,
+  alignThreshold: 5,
+  sensitivity: 3,
+};
+
+// ================= ELEMENTS =================
+const video = document.getElementById("camera");
+const targetEl = document.getElementById("target");
+const progressEl = document.getElementById("progress");
+const statusEl = document.getElementById("status");
+const startBtn = document.getElementById("startBtn");
+
+// ================= STATE =================
 let targets = [];
 let currentIndex = 0;
+let currentTarget = null;
+let holdStart = 0;
 
-let video = document.getElementById("video");
+// ================= INIT =================
+function initTargets() {
+  const yaws = [0, 60, 120, 180, 240, 300];
+  const pitches = [0, 45, -45];
 
-// ================= CAMERA STREAM =================
-navigator.mediaDevices.getUserMedia({ video: true })
-.then(stream => {
+  targets = [];
+
+  pitches.forEach(p => {
+    yaws.forEach(y => {
+      targets.push({ yaw: y, pitch: p });
+    });
+  });
+
+  currentTarget = targets[0];
+}
+
+// ================= CAMERA =================
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
   video.srcObject = stream;
-});
+}
 
-// ================= THREE SETUP =================
-scene = new THREE.Scene();
+// ================= GYRO =================
+function startGyro() {
+  window.addEventListener("deviceorientation", handleOrientation, true);
+}
 
-camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+function handleOrientation(e) {
+  if (e.alpha == null) return;
 
-renderer = new THREE.WebGLRenderer({ alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+  updateGuide(e.alpha, e.beta);
+}
 
-// ================= SPHERE =================
-let geometry = new THREE.SphereGeometry(5, 32, 32);
-let material = new THREE.MeshBasicMaterial({
-  color: 0x00ff00,
-  wireframe: true
-});
-let sphere = new THREE.Mesh(geometry, material);
-scene.add(sphere);
+// ================= GUIDE =================
+function updateGuide(yaw, pitch) {
+  const dy = normalizeAngle(currentTarget.yaw - yaw);
+  const dp = currentTarget.pitch - pitch;
 
-// ================= TARGET POINTS =================
-targets = [
-  new THREE.Vector3(0, 0, -5),
-  new THREE.Vector3(5, 0, 0),
-  new THREE.Vector3(0, 0, 5),
-  new THREE.Vector3(-5, 0, 0),
-  new THREE.Vector3(0, 5, 0),
-  new THREE.Vector3(0, -5, 0)
-];
+  moveTarget(dy, dp);
 
-// ================= DEVICE ORIENTATION =================
-window.addEventListener("deviceorientation", (event) => {
-  let alpha = event.alpha; // Yaw
-  let beta = event.beta;   // Pitch
+  const distance = Math.sqrt(dy * dy + dp * dp);
 
-  if (alpha && beta) {
-    camera.rotation.y = THREE.MathUtils.degToRad(alpha);
-    camera.rotation.x = THREE.MathUtils.degToRad(beta);
-  }
-});
-
-// ================= CAPTURE LOGIC =================
-function checkAlignment() {
-  let target = targets[currentIndex];
-
-  let direction = new THREE.Vector3();
-  camera.getWorldDirection(direction);
-
-  let angle = direction.angleTo(target.clone().normalize());
-
-  if (angle < 0.2) {
-    captureImage();
-    currentIndex++;
-
-    if (currentIndex >= targets.length) {
-      alert("Capture Complete!");
-    }
+  if (distance < CONFIG.alignThreshold) {
+    onAligned();
+  } else {
+    onNotAligned();
   }
 }
 
+// ================= UI UPDATES =================
+function moveTarget(dy, dp) {
+  const x = dy * CONFIG.sensitivity;
+  const y = dp * CONFIG.sensitivity;
+
+  targetEl.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+function onAligned() {
+  targetEl.style.background = "lime";
+
+  if (!holdStart) holdStart = Date.now();
+
+  const elapsed = Date.now() - holdStart;
+
+  updateProgress(elapsed);
+
+  statusEl.innerText = "Hold steady...";
+
+  if (elapsed > CONFIG.holdTime) {
+    captureImage();
+    nextTarget();
+    resetProgress();
+  }
+}
+
+function onNotAligned() {
+  targetEl.style.background = "red";
+  holdStart = 0;
+  resetProgress();
+
+  statusEl.innerText = "Align dot to center";
+}
+
+function updateProgress(time) {
+  const deg = (time / CONFIG.holdTime) * 360;
+  progressEl.style.transform = `translate(-50%,-50%) rotate(${deg}deg)`;
+}
+
+function resetProgress() {
+  progressEl.style.transform = `translate(-50%,-50%) rotate(0deg)`;
+}
+
+// ================= CAPTURE =================
 function captureImage() {
-  let canvas = document.createElement("canvas");
+  const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
-  let ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0);
 
-  canvas.toBlob(blob => {
-    let formData = new FormData();
-    formData.append("photo", blob);
-
-    fetch("http://localhost:3000/upload", {
-      method: "POST",
-      body: formData
-    });
-  });
+  downloadImage(canvas);
 }
 
-// ================= LOOP =================
-function animate() {
-  requestAnimationFrame(animate);
-
-  checkAlignment();
-
-  renderer.render(scene, camera);
+function downloadImage(canvas) {
+  const link = document.createElement("a");
+  link.download = `capture_${currentIndex}.jpg`;
+  link.href = canvas.toDataURL("image/jpeg");
+  link.click();
 }
 
-animate();
+// ================= FLOW =================
+function nextTarget() {
+  currentIndex++;
+
+  if (currentIndex >= targets.length) {
+    statusEl.innerText = "Capture Complete ✅";
+    return;
+  }
+
+  currentTarget = targets[currentIndex];
+  holdStart = 0;
+}
+
+// ================= UTILS =================
+function normalizeAngle(angle) {
+  angle %= 360;
+  if (angle > 180) angle -= 360;
+  if (angle < -180) angle += 360;
+  return angle;
+}
+
+// ================= START =================
+startBtn.onclick = async () => {
+  await startCamera();
+
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    const res = await DeviceOrientationEvent.requestPermission();
+    if (res === "granted") startGyro();
+  } else {
+    startGyro();
+  }
+
+  initTargets();
+
+  statusEl.innerText = "Move dot to center";
+  startBtn.style.display = "none";
+};
