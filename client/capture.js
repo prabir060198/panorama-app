@@ -1,72 +1,54 @@
 const video = document.getElementById("video");
-const status = document.getElementById("status");
-const btn = document.getElementById("start");
+const text = document.getElementById("overlay");
+const btn = document.getElementById("captureBtn");
 
-let lastYaw = null;
+let steps = ["FRONT", "RIGHT", "BACK", "LEFT"];
+let index = 0;
+
 let images = [];
 
-const STEP = 25; // overlap control
-
-async function startCamera(){
+// CAMERA
+async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
-    video:{ facingMode:"environment" }
+    video: { facingMode: "environment" }
   });
   video.srcObject = stream;
 }
 
-function startGyro(){
-  window.addEventListener("deviceorientation", e=>{
-    if(e.alpha==null) return;
-
-    handleRotation(e.alpha);
-
-  }, true);
-}
-
-function handleRotation(yaw){
-
-  if(lastYaw === null){
-    lastYaw = yaw;
-    capture();
-    return;
-  }
-
-  let diff = angleDiff(yaw, lastYaw);
-
-  if(Math.abs(diff) > STEP){
-    capture();
-    lastYaw = yaw;
-  }
-}
-
-function capture(){
-
-  let canvas = document.createElement("canvas");
+// CAPTURE IMAGE
+function capture() {
+  const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
-  let ctx = canvas.getContext("2d");
-  ctx.drawImage(video,0,0);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
 
-  canvas.toBlob(blob=>{
+  canvas.toBlob(blob => {
     images.push(blob);
-  });
 
-  status.innerText = "Captured: " + images.length;
+    index++;
+
+    if (index < steps.length) {
+      text.innerText = "Turn RIGHT → Capture " + steps[index];
+    } else {
+      text.innerText = "Uploading...";
+      uploadImages();
+    }
+  });
 }
 
-// ================= UPLOAD =================
-async function uploadImages(){
-
+// UPLOAD TO SERVER
+async function uploadImages() {
   let form = new FormData();
 
-  images.forEach((img,i)=>{
+  images.forEach((img, i) => {
     form.append("images", img, `img_${i}.jpg`);
   });
 
-  let res = await fetch("http://localhost:3000/upload",{
-    method:"POST",
-    body:form
+  let res = await fetch("http://localhost:3000/upload", {
+    method: "POST",
+    body: form
   });
 
   let data = await res.json();
@@ -74,26 +56,7 @@ async function uploadImages(){
   window.location.href = "viewer.html?img=" + data.output;
 }
 
-// ================= UTILS =================
-function angleDiff(a,b){
-  let d = a - b;
-  d = (d+180)%360 - 180;
-  return d;
-}
+// START
+btn.onclick = capture;
 
-// ================= START =================
-btn.onclick = async ()=>{
-  await startCamera();
-
-  if(typeof DeviceOrientationEvent.requestPermission==="function"){
-    let r = await DeviceOrientationEvent.requestPermission();
-    if(r==="granted") startGyro();
-  }else{
-    startGyro();
-  }
-
-  status.innerText = "Rotate slowly";
-
-  // stop after 10 sec and upload
-  setTimeout(uploadImages, 10000);
-};
+startCamera();

@@ -16,6 +16,6 @@ status, pano = stitcher.stitch(images)
 
 if status == 0:
     cv2.imwrite("output.jpg", pano)
-    print("Stitch success")
+    print("Success")
 else:
-    print("Stitch failed:", status)
+    print("Fail:", status)

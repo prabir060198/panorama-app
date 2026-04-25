@@ -2,7 +2,8 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Capture Panorama</title>
+<title>4 Step Panorama</title>
+
 <style>
 body { margin:0; background:black; }
 
@@ -13,20 +14,22 @@ video {
   object-fit:cover;
 }
 
-#status {
+#overlay {
   position:absolute;
   top:20px;
   width:100%;
   text-align:center;
   color:white;
+  font-size:20px;
 }
 
-#start {
+#captureBtn {
   position:absolute;
-  bottom:30px;
+  bottom:40px;
   left:50%;
   transform:translateX(-50%);
-  padding:15px;
+  padding:15px 25px;
+  font-size:18px;
 }
 </style>
 </head>
@@ -34,9 +37,11 @@ video {
 <body>
 
 <video id="video" autoplay playsinline></video>
-<div id="status">Start</div>
-<button id="start">START</button>
+
+<div id="overlay">Capture FRONT</div>
+<button id="captureBtn">CAPTURE</button>
 
 <script src="capture.js"></script>
+
 </body>
 </html>
